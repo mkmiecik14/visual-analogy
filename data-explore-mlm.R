@@ -8,8 +8,8 @@
 source("r-prep.R") # prepares R workspace
 
 # Loads data ----
-all_data <- read_rds("../output/analogy-data.rds") # includes all vars
-vis_data <- read_rds("../output/raw-visual-data.rds") # only raw vis data
+all_data <- read_rds("output/analogy-data.rds") # includes all vars
+vis_data <- read_rds("output/raw-visual-data.rds") # only raw vis data
 
 # Looking at accuracy ----
 # subject-wise
@@ -56,7 +56,7 @@ ggplot(vis_acc_sum, aes(factor(rc), M, group = inhib, color = inhib)) +
   scale_color_manual(values = ghibli_palettes$PonyoMedium[c(2,4)]) +
   theme(legend.position = "bottom")
 
-# Linear Mixed-Effect Modeling ----
+# Linear Mixed-Effect Modeling - - - -
 
 # maximal model
 vis_acc_data <- 
@@ -71,15 +71,17 @@ vis_acc_data <-
 contrasts(vis_acc_data$rc) <- cbind(rc = c(.5, -.5)) # acc 1 > 2
 contrasts(vis_acc_data$inhib) <- cbind(inhib = c(.5, -.5)) # acc no > yes
 
-# mem model
-acc_max_mod <-
+# MINIMAL MODEL
+acc_min_mod <-
   lmer(
-    acc ~ 1 + rc*inhib + (1 + rc*inhib | ss), 
+    acc ~ 1 + rc*inhib + (1 | ss), 
     data = vis_acc_data, 
     REML = TRUE
   )
-summary(acc_max_mod) # model summary
+summary(acc_min_mod) # model summary
 
+# MEDIUM COMPLEXITY MODEL
+# - individual slopes for rc and inhib
 acc_2_mod <-
   lmer(
     acc ~ 1 + rc*inhib + (1 + rc + inhib | ss), 
@@ -88,17 +90,18 @@ acc_2_mod <-
   )
 summary(acc_2_mod) # model summary
 
-anova(acc_max_mod, acc_2_mod)
-
-acc_3_mod <-
+# MAXIMUM MODEL
+# - individual slopse for rc and inhib, as well as their interaction
+acc_max_mod <-
   lmer(
-    acc ~ 1 + rc + inhib + (1 + rc + inhib | ss), 
+    acc ~ 1 + rc*inhib + (1 + rc*inhib | ss), 
     data = vis_acc_data, 
     REML = TRUE
   )
-summary(acc_3_mod) # model summary
+summary(acc_max_mod) # model summary
 
-anova(acc_max_mod, acc_3_mod)
+# Model Comparison
+anova(acc_min_mod, acc_2_mod, acc_max_mod) # best model is acc_2_mod
 
 ######
 #    #
@@ -118,10 +121,10 @@ anova(acc_max_mod, acc_3_mod)
 #* 1 relational complexity
 #* 
 #*                      Signal
-#*                      Present | Absent |
-#*            Response   VALID | INVALID
-#*                  YES |  HIT   |   FA   |
-#*                  NO  | MISS   |    CR  |
+#*                      Present | Absent  |
+#*            Response   VALID  | INVALID |
+#*                  YES |  HIT  |   FA    |
+#*                  NO  | MISS  |   CR    |
 #*                  
 #*  repeat ^ for 2 relations
 #*                        
@@ -142,7 +145,11 @@ sdt_calc <-
   )
   )
 
-vis_data %>% filter(ss == 1325) %>% filter(inhib == "yes") %>% group_by(rc) %>% count(validity,acc)
+# vis_data %>% 
+#   filter(ss == 1325) %>% 
+#   filter(inhib == "yes") %>% 
+#   group_by(rc) %>% 
+#   count(validity,acc)
 
 # wide format
 sdt_data <- 
@@ -166,8 +173,10 @@ dprimes <-
     adjusted = TRUE
     )
 
-# combines dprime estimates withe the rest of the data
-sdt_res <- as_tibble(cbind(sdt_data, dprimes))
+# combines dprime estimates with the rest of the data
+sdt_res <- 
+  as_tibble(cbind(sdt_data, dprimes)) %>%
+  mutate(rc = factor(rc))
 
 # summary measures
 sdt_res_sum <-
@@ -207,10 +216,93 @@ ggplot(sdt_res_sum %>% filter(name == "dprime"), aes(factor(rc), M, group = 1)) 
   labs(x = "Relations", y = "d'") +
   theme_minimal()
 
-# now run a mixed model
+# d' linear mixed effects modeling
 
-# then do correct RT
+# sets contrast
+contrasts(sdt_res$rc) <- cbind(rc = c(.5, -.5)) # acc 1 > 2
 
+# MINIMAL MODEL
+sdt_min_mod <-
+  lmer(
+    dprime ~ 1 + rc + (1 | ss), 
+    data = sdt_res, 
+    REML = TRUE
+  )
+summary(sdt_min_mod) # model summary
+
+# MAXIMAL MODEL
+# is too complex to compute because the number of random effects is = to ss
+# sdt_max_mod <-
+#   lmer(
+#     dprime ~ 1 + rc + (1 + rc | ss), 
+#     data = sdt_res, 
+#     REML = TRUE
+#   )
+# summary(sdt_max_mod) # model summary
+
+
+##############
+#            #
+# CORRECT RT #
+#            #
+##############
+
+# establishes df
+corRT_data <- 
+  vis_data %>% 
+  filter(acc == 1) # excludes incorrect trials (i.e., selects correct RTs)
+
+# summarize by subject
+corRT_data_ss <-
+  corRT_data %>%
+  group_by(ss, rc, inhib, validity) %>%
+  summarise(m = mean(rt), n = n()) %>%
+  ungroup()
+
+# histograms
+ggplot(corRT_data_ss %>% filter(validity == "valid"), aes(m)) +
+  geom_histogram(binwidth = 250) +
+  labs(x = "Correct RT (ms)", y = "Frequency", title = "Valid Trials") +
+  facet_grid(rc~inhib)
+
+ggplot(corRT_data_ss %>% filter(validity == "invalid"), aes(m)) +
+  geom_histogram(binwidth = 250) +
+  labs(x = "Correct RT (ms)", y = "Frequency", title = "Invalid Trials") +
+  facet_wrap(~rc)
+
+# group-wise
+corRT_data_sum <-
+  corRT_data_ss %>%
+  group_by(rc, inhib, validity) %>%
+  summarise(
+    M = mean(m), 
+    SD = sd(m), 
+    N = n(), 
+    SEM = SD/sqrt(N), 
+    LL = quantile(m, .025, na.rm = TRUE),
+    UL = quantile(m, .975, na.rm = TRUE)
+  ) %>%
+  ungroup() 
+
+# plot
+pj <- position_jitter(width = .2)
+ggplot(corRT_data_sum, aes(factor(rc), M, group = inhib, color = inhib)) +
+  geom_point(
+    data = corRT_data_ss, 
+    aes(y=m), 
+    shape = 1, 
+    alpha = 1/2,
+    position = pj
+  ) +
+  geom_point() +
+  geom_line() +
+  geom_errorbar(aes(ymin=M-SEM, ymax=M+SEM), width = .1) +
+  theme_minimal() +
+  facet_wrap(~validity) +
+  scale_color_manual(values = ghibli_palettes$PonyoMedium[c(2,4)]) +
+  theme(legend.position = "bottom")
+
+# Linear mixed effects modeling here for correct RT
 
 
 

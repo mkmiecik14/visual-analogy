@@ -5,7 +5,7 @@
 # Purpose: get a handle on the data
 
 source("r-prep.R") # prepares R workspace
-analogy_data <- read_rds("../output/analogy-data.rds") # reads in data
+analogy_data <- read_rds("output/analogy-data.rds") # reads in data
 
 # Exploring visual analogy data ----
 vis_data <- 
