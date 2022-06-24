@@ -6,4 +6,14 @@
 
 # Loads libraries ----
 library(tidyverse); library(Hmisc); library(readxl)
+
+# Plotting tools
 library(ghibli)
+
+# mixed effects modeling
+library(lme4)
+library(broomExtra)
+library(lmerTest)
+
+# for d'
+library(psycho)
