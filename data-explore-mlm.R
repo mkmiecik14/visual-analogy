@@ -53,6 +53,11 @@ ggplot(vis_acc_sum, aes(factor(rc), M, group = inhib, color = inhib)) +
   geom_errorbar(aes(ymin=M-SEM, ymax=M+SEM), width = .2) +
   theme_minimal() +
   facet_wrap(~validity) +
+  labs(
+    x = "Relational Complexity", 
+    y = "Mean Prop. Correct", 
+    caption = "SEM error bars."
+    ) +
   scale_color_manual(values = ghibli_palettes$PonyoMedium[c(2,4)]) +
   theme(legend.position = "bottom")
 
@@ -178,6 +183,20 @@ sdt_res <-
   as_tibble(cbind(sdt_data, dprimes)) %>%
   mutate(rc = factor(rc))
 
+# SAVES OUT FOR LARA
+vis_dprime_ss <- 
+  sdt_res %>% 
+  pivot_wider(
+    id_cols = ss, 
+    names_prefix = "rc_", 
+    names_from = rc, 
+    values_from = dprime
+    ) %>%
+  mutate(total_dprime = (rc_1+rc_2)/2)
+# saves out
+# uncomment to save out
+# write_csv(vis_dprime_ss, file = "output/vis-dprime-ss.csv")
+
 # summary measures
 sdt_res_sum <-
   sdt_res %>%
@@ -210,10 +229,11 @@ ggplot(sdt_res_sum %>% filter(name == "dprime"), aes(factor(rc), M, group = 1)) 
     aes(factor(rc), dprime), 
     alpha = 1/3,
     position = pj) +
+  geom_hline(yintercept = 0, linetype = 2) +
   geom_point(position = pn) +
   geom_errorbar(aes(ymin=M-SEM, ymax = M+SEM), width = .1, position = pn) +
   geom_line(position = pn) +
-  labs(x = "Relations", y = "d'") +
+  labs(x = "Relational Complexity", y = "d'", caption = "SEM error bars") +
   theme_minimal()
 
 # d' linear mixed effects modeling
