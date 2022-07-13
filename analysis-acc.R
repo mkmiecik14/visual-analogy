@@ -105,18 +105,85 @@ summary(acc_max_mod) # model summary
 # Model Comparison
 anova(acc_min_mod, acc_2_mod, acc_max_mod) # best model is acc_2_mod
 
-# Prepping cognitive component data - - - -
-all_data %>%
-  select(
-    ss, 
-    sex, 
-    age, 
-    starts_with("BP"), 
-    OSpan, 
-    RSpan, 
-    NumberSeries, 
-    RAPM, 
-    GenKnow, 
-    TextComp, 
-    ShipleyVocab
+########################
+#                      #
+# Cognitive Components #
+#                      #
+########################
+
+load("output/cog-data.rda") # brings in cognitive components
+
+length(unique(vis_acc_data$ss)) # 213 subjects in analyses above
+
+# drops to 208 due to missing data (will drop further after z-scoring etc.)
+cog_data %>% filter(ss %in% unique(vis_acc_data$ss)) 
+
+# prepares with z-scores and composite variables
+cog_data_z <- 
+  cog_data %>% 
+  filter(ss %in% unique(vis_acc_data$ss)) %>% # keeps only ss with vis analogy data 
+  mutate(
+    across(
+      .cols = c(bp_index:shipley_vocab), # excludes sex and age
+      .fns = ~as.numeric(scale(.x)), # z-scores columns
+      .names = "z_{.col}") # names them with a leading "z_"
+    ) %>%
+  mutate(
+    wm = z_ospan + z_rspan, # working memory (greater scores = better wm)
+    gf = z_num_series + z_rapm, # fluid intelligence (greater scores = higher IQ)
+    gc = z_gen_know + z_text_comp + z_shipley_vocab, # crys intel (greater scores = higher IQ)
+    ic = z_bp_index + z_verbgen_ir # interference control (greater scores = worse IC!)
+  )
+
+# visualization of the variables - - - -
+
+# conversion to long format
+cog_data_z_long <- cog_data_z %>% select(-sex, -age) %>% pivot_longer(-ss)
+
+# Raw values - variables for plotting
+these_vars <- 
+  c(
+    "bp_index", "verbgen_ir", "ospan", "rspan", "num_series", "rapm", 
+    "gen_know", "text_comp", "shipley_vocab"
     )
+pj <- position_jitter(width = .1)
+ggplot(
+  cog_data_z_long %>% filter(name %in% these_vars), 
+  aes(name, value)
+  ) +
+  geom_point(position = pj, alpha = 1/3) +
+  geom_boxplot(width = .2, position = position_nudge(x = .3)) +
+  facet_wrap(~name, scales = "free") +
+  theme_bw()
+
+# Z-scores - variables for plotting
+these_vars <- 
+  c(
+    "z_bp_index", "z_verbgen_ir", "z_ospan", "z_rspan", "z_num_series", "z_rapm", 
+    "z_gen_know", "z_text_comp", "z_shipley_vocab"
+  )
+pj <- position_jitter(width = .1)
+ggplot(
+  cog_data_z_long %>% filter(name %in% these_vars), 
+  aes(name, value)
+) +
+  geom_point(position = pj, alpha = 1/3) +
+  geom_boxplot(width = .2, position = position_nudge(x = .3)) +
+  theme_bw()
+
+
+# Composite variables - variables for plotting
+these_vars <- c("wm", "ic", "gc", "gf")
+pj <- position_jitter(width = .1)
+ggplot(
+  cog_data_z_long %>% filter(name %in% these_vars), 
+  aes(name, value)
+) +
+  geom_point(position = pj, alpha = 1/3) +
+  geom_boxplot(width = .2, position = position_nudge(x = .3)) +
+  labs(x = "Composite Variable", y = "Summated Z-Score") +
+  theme_bw()
+
+# Linear mixed modeling with cognitive variables NEXT!
+
+
