@@ -14,6 +14,7 @@ library(ghibli)
 library(lme4)
 library(broomExtra)
 library(lmerTest)
+library(interactions) # visualizes interactions
 
 # for d'
 library(psycho)

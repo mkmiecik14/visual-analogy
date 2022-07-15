@@ -149,13 +149,176 @@ sdt_min_mod <-
     REML = TRUE
   )
 summary(sdt_min_mod) # model summary
+performance::check_model(sdt_min_mod)
 
 # MAXIMAL MODEL
 # is too complex to compute because the number of random effects is = to ss
 # sdt_max_mod <-
 #   lmer(
-#     dprime ~ 1 + rc + (1 + rc | ss), 
-#     data = sdt_res, 
+#     dprime ~ 1 + rc + (1 + rc | ss),
+#     data = sdt_res,
 #     REML = TRUE
 #   )
 # summary(sdt_max_mod) # model summary
+
+########################
+#                      #
+# Cognitive Components #
+#                      #
+########################
+
+load("output/cog-data.rda") # brings in cognitive components
+
+mod_data <- sdt_res # helps with copy/paste from previous script
+
+length(unique(mod_data$ss)) # 213 subjects in analyses above
+
+# drops to 208 due to missing data (will drop further after z-scoring etc.)
+cog_data %>% filter(ss %in% unique(mod_data$ss)) 
+
+# prepares with z-scores and composite variables
+cog_data_z <- 
+  cog_data %>% 
+  filter(ss %in% unique(mod_data$ss)) %>% # keeps only ss with vis analogy data 
+  mutate(
+    across(
+      .cols = c(bp_index:shipley_vocab), # excludes sex and age
+      .fns = ~as.numeric(scale(.x)), # z-scores columns
+      .names = "z_{.col}") # names them with a leading "z_"
+  ) %>%
+  mutate(
+    wm = z_ospan + z_rspan, # working memory (greater scores = better wm)
+    gf = z_num_series + z_rapm, # fluid intelligence (greater scores = higher IQ)
+    gc = z_gen_know + z_text_comp + z_shipley_vocab, # crys intel (greater scores = higher IQ)
+    ic = z_bp_index + z_verbgen_ir # interference control (greater scores = worse IC!)
+  )
+
+# visualization of the variables - - - -
+
+# conversion to long format
+cog_data_z_long <- cog_data_z %>% select(-sex, -age) %>% pivot_longer(-ss)
+
+# Raw values - variables for plotting
+these_vars <- 
+  c(
+    "bp_index", "verbgen_ir", "ospan", "rspan", "num_series", "rapm", 
+    "gen_know", "text_comp", "shipley_vocab"
+  )
+pj <- position_jitter(width = .1)
+ggplot(
+  cog_data_z_long %>% filter(name %in% these_vars), 
+  aes(name, value)
+) +
+  geom_point(position = pj, alpha = 1/3) +
+  geom_boxplot(width = .2, position = position_nudge(x = .3)) +
+  facet_wrap(~name, scales = "free") +
+  theme_bw()
+
+# Z-scores - variables for plotting
+these_vars <- 
+  c(
+    "z_bp_index", "z_verbgen_ir", "z_ospan", "z_rspan", "z_num_series", "z_rapm", 
+    "z_gen_know", "z_text_comp", "z_shipley_vocab"
+  )
+pj <- position_jitter(width = .1)
+ggplot(
+  cog_data_z_long %>% filter(name %in% these_vars), 
+  aes(name, value)
+) +
+  geom_point(position = pj, alpha = 1/3) +
+  geom_boxplot(width = .2, position = position_nudge(x = .3)) +
+  theme_bw()
+
+
+# Composite variables - variables for plotting
+these_vars <- c("wm", "ic", "gc", "gf")
+pj <- position_jitter(width = .1)
+ggplot(
+  cog_data_z_long %>% filter(name %in% these_vars), 
+  aes(name, value)
+) +
+  geom_point(position = pj, alpha = 1/3) +
+  geom_boxplot(width = .2, position = position_nudge(x = .3)) +
+  labs(x = "Composite Variable", y = "Summated Z-Score") +
+  theme_bw()
+
+# Linear mixed modeling with cognitive variables - - - -
+
+# narrows down to composites
+cog_composites <- cog_data_z %>% select(ss, age, wm, gf, gc, ic)
+
+# combines vis acc data with cog data
+mod_cog_data <- 
+  mod_data %>% 
+  left_join(., cog_composites, by = "ss") %>% # should be 179 ss
+  mutate(ic = ic*-1) # flips IC so that greater scores = better IC
+  
+contrasts(mod_cog_data$rc) # proof that contrasts are set
+
+# MINIMAL MODEL
+cog_min_mod <-
+  lmer(
+    dprime ~ 1 + age + rc*wm + rc*gf + rc*gc + rc*ic + (1 | ss), 
+    data = mod_cog_data, 
+    REML = TRUE
+  )
+summary(cog_min_mod) # model summary
+performance::check_model(cog_min_mod)
+
+cog_min_mod2 <-
+  lmer(
+    dprime ~ 1 + age + rc*wm + rc*gf + rc*gc + rc*(ic*-1) + (1 | ss), 
+    data = mod_cog_data, 
+    REML = TRUE
+  )
+summary(cog_min_mod2) # model summary
+performance::check_model(cog_min_mod)
+
+# Bootstrapped zero-order correlations - - - -
+# Zero order correlations
+set.seed(14) # sets seed for reproducible boostrapping
+
+# preps data
+dprime_grand <- 
+  mod_cog_data %>% 
+  group_by(ss) %>%
+  summarise(
+    va_dprime = mean(dprime),
+    trials = n()
+  ) %>%
+  ungroup() %>%
+  left_join(., cog_composites, by = "ss") %>%
+  filter(complete.cases(.)) # ends with n=179
+dprime_grand %>% filter(trials != 2) # all will have 2 trials (i.e., conditions)
+
+# Computes bootstrapped correlations
+zero_order_cors <-
+  psych::corr.test(
+    dprime_grand %>% select(-ss, -trials),
+    use = "pairwise",
+    method = "pearson", 
+    adjust = "none",
+    ci = TRUE,
+    minlength = 100 # extends the abrreviations
+  )
+zero_order_cors$ci # the results
+
+# correlation results as tibble for plotting
+cor_res <- 
+  as_tibble(zero_order_cors$ci, rownames = "var") %>%
+  separate(var, into = c("var1", "var2"), sep = "-") %>%
+  mutate(var2 = fct_relevel(var2, c("wm", "ic", "gc", "gf")))
+
+# correlation plot
+ggplot(cor_res %>% filter(var1 == "va_dprime"), aes(var2, r)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = .2) +
+  coord_cartesian(ylim = c(-1, 1)) +
+  geom_hline(yintercept = 0, alpha = 1/3, linetype = 2) +
+  labs(
+    x = "Predictors", 
+    y = "r (correlation with total visual correct RT)", 
+    caption = "95% CI error bars."
+  ) +
+  theme_classic() +
+  theme(legend.position = "none")

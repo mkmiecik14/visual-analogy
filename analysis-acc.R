@@ -184,6 +184,108 @@ ggplot(
   labs(x = "Composite Variable", y = "Summated Z-Score") +
   theme_bw()
 
-# Linear mixed modeling with cognitive variables NEXT!
+# Linear mixed modeling with cognitive variables - - - -
 
+# narrows down to composites
+cog_composites <- cog_data_z %>% select(ss, age, wm, gf, gc, ic)
 
+# combines vis acc data with cog data
+vis_acc_cog_data <- 
+  vis_acc_data %>% 
+  left_join(., cog_composites, by = "ss") %>% # should be 179 ss
+  mutate(ic = ic*-1) # flips IC so that greater scores = better IC
+  
+contrasts(vis_acc_cog_data$rc) # proof that contrasts are set
+contrasts(vis_acc_cog_data$inhib) # proof that contrasts are set
+unique(vis_acc_cog_data$validity) # proof that only valid trials are analyzed
+
+# MINIMAL MODEL
+acc_cog_min_mod <-
+  lmer(
+    acc ~ 1 + age + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 | ss), 
+    data = vis_acc_cog_data, 
+    REML = TRUE
+  )
+summary(acc_cog_min_mod) # model summary
+
+# MEDIUM COMPLEXITY MODEL
+# - individual slopes for rc and inhib
+acc_cog_2_mod <-
+  lmer(
+    acc ~ 1 + age + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc + inhib | ss), 
+    data = vis_acc_cog_data, 
+    REML = TRUE
+  )
+summary(acc_cog_2_mod) # model summary
+
+# MAXIMUM MODEL
+# - individual slopes for rc and inhib, as well as their interaction
+acc_cog_max_mod <-
+  lmer(
+    acc ~ 
+      1 + age + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc*inhib | ss), 
+    data = vis_acc_cog_data, 
+    REML = TRUE
+  )
+summary(acc_cog_max_mod) # model summary
+performance::check_model(acc_cog_max_mod)
+
+# Model Comparison
+anova(acc_cog_min_mod, acc_cog_2_mod, acc_cog_max_mod) # best model is max_mod
+
+# WM * inhibition
+interact_plot(
+  acc_cog_2_mod, 
+  pred = wm, 
+  modx = inhib, 
+  plot.points = FALSE
+)
+
+# Bootstrapped zero-order correlations - - - -
+# Zero order correlations
+set.seed(14) # sets seed for reproducible boostrapping
+
+# preps data
+vis_acc_grand <- 
+  vis_acc_cog_data %>% 
+  group_by(ss) %>%
+  summarise(
+    va_acc = mean(acc),
+    trials = n()
+  ) %>%
+  ungroup() %>%
+  left_join(., cog_composites, by = "ss") %>%
+  filter(complete.cases(.)) # ends with n=179
+vis_acc_grand %>% filter(trials != 96) # all have 96 trials
+
+# Computes bootstrapped correlations
+zero_order_cors <-
+  psych::corr.test(
+    vis_acc_grand %>% select(-ss, -trials),
+    use = "pairwise",
+    method = "pearson", 
+    adjust = "none",
+    ci = TRUE,
+    minlength = 100 # extends the abrreviations
+  )
+zero_order_cors$ci # the results
+
+# correlation results as tibble for plotting
+cor_res <- 
+  as_tibble(zero_order_cors$ci, rownames = "var") %>%
+  separate(var, into = c("var1", "var2"), sep = "-") %>%
+  mutate(var2 = fct_relevel(var2, c("wm", "ic", "gc", "gf")))
+
+# correlation plot
+ggplot(cor_res %>% filter(var1 == "va_acc"), aes(var2, r)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = .2) +
+  coord_cartesian(ylim = c(-1, 1)) +
+  geom_hline(yintercept = 0, alpha = 1/3, linetype = 2) +
+  labs(
+    x = "Predictors", 
+    y = "r (correlation with total visual analogy acc)", 
+    caption = "95% CI error bars."
+  ) +
+  theme_classic() +
+  theme(legend.position = "none")
