@@ -199,6 +199,66 @@ contrasts(vis_acc_cog_data$rc) # proof that contrasts are set
 contrasts(vis_acc_cog_data$inhib) # proof that contrasts are set
 unique(vis_acc_cog_data$validity) # proof that only valid trials are analyzed
 
+# vis analogy accuracy summary (subject-wise)
+acc_model_ss <- 
+  cog_composites %>%
+  filter(complete.cases(.)) %>% # includes only ss with complete cog data
+  left_join(., vis_acc_ss, by = "ss") 
+
+# vis analogy accuracy summary (group-wise)
+acc_model_sum <- 
+  acc_model_ss %>%
+  group_by(rc, inhib, validity) %>%
+  summarise(
+    M = mean(m), 
+    SD = sd(m), 
+    N = n(), 
+    SEM = SD/sqrt(N), 
+    LL = quantile(m, .025, na.rm = TRUE),
+    UL = quantile(m, .975, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# valid only plot (bar plot version)
+pd <- position_dodge(width = .5)
+ggplot(
+  acc_model_sum %>% filter(validity == "valid"), 
+  aes(factor(rc), M, group = inhib, fill = inhib)
+  ) +
+  geom_bar(stat = "identity", position = pd, color = "black", width = .5) +
+  geom_errorbar(aes(ymin=M-SEM, ymax = M+SEM), width = .1, position = pd) +
+  scale_fill_manual(values = ghibli_palettes$PonyoLight[3:4]) +
+  coord_cartesian(ylim = c(.5, 1)) +
+  scale_y_continuous(breaks = seq(.5, 1, .1)) +
+  labs(
+    x = "Relational Numerosity", 
+    y = "Proportion Correct", 
+    caption = "SEM error bars."
+    ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+# vis analogy acc plot point version 
+pn <- position_nudge(x = .2, y = 0)
+pj <- position_jitter(width = .1)
+ggplot(
+  acc_model_sum %>% filter(validity == "valid"), 
+  aes(factor(rc), M, group = inhib, color = inhib)
+) +
+  geom_point(data = acc_model_ss, aes(y = m), position = pj, alpha = 1/3, shape = 16) +
+  geom_point(position = pn) +
+  geom_errorbar(aes(ymin=M-SEM, ymax = M+SEM), width = .1, position = pn) +
+  geom_line(position = pn) +
+  scale_color_manual(values = ghibli_palettes$PonyoMedium[3:4]) +
+  scale_y_continuous(breaks = seq(0, 1, .2)) +
+  labs(
+    x = "Relational Numerosity", 
+    y = "Proportion Correct", 
+    caption = "SEM error bars."
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
 # MINIMAL MODEL
 acc_cog_min_mod <-
   lmer(
@@ -231,7 +291,11 @@ summary(acc_cog_max_mod) # model summary
 performance::check_model(acc_cog_max_mod)
 
 # Model Comparison
-anova(acc_cog_min_mod, acc_cog_2_mod, acc_cog_max_mod) # best model is max_mod
+model_anova <- 
+  anova(acc_cog_min_mod, acc_cog_2_mod, acc_cog_max_mod) # best model is max_mod
+model_anova_tidy <- broom::tidy(model_anova) # converts to df
+# saves out for reporting
+write_csv(model_anova_tidy, file = "output/acc-model-anova-tidy.csv")
 
 # WM * inhibition
 interact_plot(
