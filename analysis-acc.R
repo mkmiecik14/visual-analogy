@@ -278,6 +278,26 @@ acc_cog_2_mod <-
   )
 summary(acc_cog_2_mod) # model summary
 
+# Extracting estimates for table
+acc_cog_2_mod_ests <- broom::tidy(acc_cog_2_mod)
+
+acc_cog_2_mod_ests %>% 
+  filter(effect == "fixed") %>%
+  mutate(
+    term = case_when(
+      term == "(Intercept)" ~ "Intercept",
+      term == "rcrc" ~ "rn",
+      term == "inhibinhib" ~ "inhib",
+      term == "rcrc:inhibinhib" ~ "rn * inhib",
+      term == "rcrc:wm"
+      TRUE ~ term
+      # CONTINUE WITH TABLE
+      
+    )
+    )
+  
+  
+
 # MAXIMUM MODEL
 # - individual slopes for rc and inhib, as well as their interaction
 acc_cog_max_mod <-
@@ -294,8 +314,10 @@ performance::check_model(acc_cog_max_mod)
 model_anova <- 
   anova(acc_cog_min_mod, acc_cog_2_mod, acc_cog_max_mod) # best model is max_mod
 model_anova_tidy <- broom::tidy(model_anova) # converts to df
+
 # saves out for reporting
-write_csv(model_anova_tidy, file = "output/acc-model-anova-tidy.csv")
+# uncomment to save out
+#write_csv(model_anova_tidy, file = "output/acc-model-anova-tidy.csv")
 
 # WM * inhibition
 interact_plot(

@@ -13,6 +13,7 @@ library(ghibli)
 # mixed effects modeling
 library(lme4)
 library(broomExtra)
+library(broom.mixed)
 library(lmerTest)
 library(interactions) # visualizes interactions
 
