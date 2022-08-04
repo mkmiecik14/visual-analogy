@@ -279,9 +279,12 @@ acc_cog_2_mod <-
 summary(acc_cog_2_mod) # model summary
 
 # Extracting estimates for table
-acc_cog_2_mod_ests <- broom::tidy(acc_cog_2_mod)
+acc_cog_2_mod_ests <- 
+  broom::tidy(acc_cog_2_mod, conf.int = TRUE, conf.level = 0.95)
 
-acc_cog_2_mod_ests %>% 
+# fixed effects table
+acc_cog_2_mod_fixed <- 
+  acc_cog_2_mod_ests %>% 
   filter(effect == "fixed") %>%
   mutate(
     term = case_when(
@@ -289,12 +292,60 @@ acc_cog_2_mod_ests %>%
       term == "rcrc" ~ "rn",
       term == "inhibinhib" ~ "inhib",
       term == "rcrc:inhibinhib" ~ "rn * inhib",
-      term == "rcrc:wm"
+      term == "rcrc:wm" ~ "rn * wm",
+      term == "inhibinhib:wm" ~ "inhib * wm",
+      term == "rcrc:gf" ~ "rn * gf",
+      term == "inhibinhib:gf" ~ "inhib * gf",
+      term == "rcrc:gc" ~ "rn * gc",
+      term == "inhibinhib:gc" ~ "inhib * gc",
+      term == "rcrc:ic" ~ "rn * ic",
+      term == "inhibinhib:ic" ~ "inhib * ic",
+      term == "rcrc:inhibinhib:wm" ~ "rn * inhib * wm",
+      term == "rcrc:inhibinhib:gf" ~ "rn * inhib * gf",
+      term == "rcrc:inhibinhib:gc" ~ "rn * inhib * gc",
+      term == "rcrc:inhibinhib:ic" ~ "rn * inhib * ic",
       TRUE ~ term
-      # CONTINUE WITH TABLE
-      
+      )
+    ) %>%
+  # reorders for nicer table
+  select(
+    effect, 
+    term, 
+    b = estimate, 
+    LL = conf.low, 
+    UL = conf.high, 
+    SE = std.error, 
+    t = statistic, 
+    df, 
+    p = p.value
     )
+# writes out to csv
+# uncomment to save out
+#write_csv(acc_cog_2_mod_fixed, file = "output/acc-model-fixed-effects.csv")
+
+# random effects
+acc_cog_2_mod_random <- 
+  acc_cog_2_mod_ests %>% 
+  filter(effect == "ran_pars") %>%
+  mutate(effect = "random") %>%
+  separate(term, into = c("stat", "terms"), sep = "__") %>%
+  mutate(
+    terms = case_when(
+      terms == "(Intercept)" ~ "Intercept",
+      terms == "(Intercept).rcrc" ~ "Intercept vs. rn",
+      terms == "(Intercept).inhibinhib" ~ "Intercept vs. inhib",
+      terms == "rcrc" ~ "rn",
+      terms == "rcrc.inhibinhib" ~ "rn vs. inhib",
+      terms == "inhibinhib" ~ "inhib",
+      TRUE ~ terms
     )
+  ) %>%
+  select(effect:estimate)
+# writes out to csv
+# uncomment to save out
+#write_csv(acc_cog_2_mod_random, file = "output/acc-model-rand-effects.csv")
+
+
   
   
 
