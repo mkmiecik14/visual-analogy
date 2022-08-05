@@ -210,6 +210,66 @@ contrasts(mod_cog_data$rc) # proof that contrasts are set
 contrasts(mod_cog_data$inhib) # proof that contrasts are set
 unique(mod_cog_data$validity) # proof that only valid trials are analyzed
 
+# vis analogy corRT summary (subject-wise)
+corRT_model_ss <- 
+  cog_composites %>%
+  filter(complete.cases(.)) %>% # includes only ss with complete cog data
+  left_join(., corRT_data_ss, by = "ss") 
+
+# vis analogy corRT summary (group-wise)
+corRT_model_sum <- 
+  corRT_model_ss %>%
+  group_by(rc, inhib, validity) %>%
+  summarise(
+    M = mean(m), 
+    SD = sd(m), 
+    N = n(), 
+    SEM = SD/sqrt(N), 
+    LL = quantile(m, .025, na.rm = TRUE),
+    UL = quantile(m, .975, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# valid only plot (bar plot version)
+pd <- position_dodge(width = .5)
+ggplot(
+  corRT_model_sum %>% filter(validity == "valid"), 
+  aes(factor(rc), M, group = inhib, fill = inhib)
+) +
+  geom_bar(stat = "identity", position = pd, color = "black", width = .5) +
+  geom_errorbar(aes(ymin=M-SEM, ymax = M+SEM), width = .1, position = pd) +
+  scale_fill_manual(values = ghibli_palettes$PonyoLight[3:4]) +
+  coord_cartesian(ylim = c(0, 4500)) +
+  scale_y_continuous(breaks = seq(0, 4500, 500), minor_breaks = NULL) +
+  labs(
+    x = "Relational Numerosity", 
+    y = "Proportion Correct", 
+    caption = "SEM error bars."
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+# vis analogy corRT plot point version 
+pn <- position_nudge(x = .2, y = 0)
+pj <- position_jitter(width = .1)
+ggplot(
+  corRT_model_sum %>% filter(validity == "valid"), 
+  aes(factor(rc), M, group = inhib, color = inhib)
+) +
+  geom_point(data = corRT_model_ss, aes(y = m), position = pj, alpha = 1/3, shape = 16) +
+  geom_point(position = pn) +
+  geom_errorbar(aes(ymin=M-SEM, ymax = M+SEM), width = .1, position = pn) +
+  geom_line(position = pn) +
+  scale_color_manual(values = ghibli_palettes$PonyoMedium[3:4]) +
+  #scale_y_continuous(breaks = seq(0, 1, .2)) +
+  labs(
+    x = "Relational Numerosity", 
+    y = "Proportion Correct", 
+    caption = "SEM error bars."
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
 # MINIMAL MODEL
 cog_min_mod <-
   lmer(
@@ -253,6 +313,74 @@ cog_2_mod <-
   )
 summary(cog_2_mod) # model summary
 
+# Extracting estimates for table
+cog_2_mod_ests <- 
+  broom::tidy(cog_2_mod, conf.int = TRUE, conf.level = 0.95)
+
+# fixed effects table
+cog_2_mod_fixed <- 
+  cog_2_mod_ests %>% 
+  filter(effect == "fixed") %>%
+  mutate(
+    term = case_when(
+      term == "(Intercept)" ~ "Intercept",
+      term == "rcrc" ~ "rn",
+      term == "inhibinhib" ~ "inhib",
+      term == "rcrc:inhibinhib" ~ "rn * inhib",
+      term == "rcrc:wm" ~ "rn * wm",
+      term == "inhibinhib:wm" ~ "inhib * wm",
+      term == "rcrc:gf" ~ "rn * gf",
+      term == "inhibinhib:gf" ~ "inhib * gf",
+      term == "rcrc:gc" ~ "rn * gc",
+      term == "inhibinhib:gc" ~ "inhib * gc",
+      term == "rcrc:ic" ~ "rn * ic",
+      term == "inhibinhib:ic" ~ "inhib * ic",
+      term == "rcrc:inhibinhib:wm" ~ "rn * inhib * wm",
+      term == "rcrc:inhibinhib:gf" ~ "rn * inhib * gf",
+      term == "rcrc:inhibinhib:gc" ~ "rn * inhib * gc",
+      term == "rcrc:inhibinhib:ic" ~ "rn * inhib * ic",
+      TRUE ~ term
+    )
+  ) %>%
+  # reorders for nicer table
+  select(
+    effect, 
+    term, 
+    b = estimate, 
+    LL = conf.low, 
+    UL = conf.high, 
+    SE = std.error, 
+    t = statistic, 
+    df, 
+    p = p.value
+  )
+# writes out to csv
+# uncomment to save out
+#write_csv(cog_2_mod_fixed, file = "output/corRT-model-fixed-effects.csv")
+
+# random effects
+cog_2_mod_random <- 
+  cog_2_mod_ests %>% 
+  filter(effect == "ran_pars") %>%
+  mutate(effect = "random") %>%
+  separate(term, into = c("stat", "terms"), sep = "__") %>%
+  mutate(
+    terms = case_when(
+      terms == "(Intercept)" ~ "Intercept",
+      terms == "(Intercept).rcrc" ~ "Intercept vs. rn",
+      terms == "(Intercept).inhibinhib" ~ "Intercept vs. inhib",
+      terms == "rcrc" ~ "rn",
+      terms == "rcrc.inhibinhib" ~ "rn vs. inhib",
+      terms == "inhibinhib" ~ "inhib",
+      TRUE ~ terms
+    )
+  ) %>%
+  select(effect:estimate)
+# writes out to csv
+# uncomment to save out
+#write_csv(cog_2_mod_random, file = "output/corRT-model-rand-effects.csv")
+
+
 # MAXIMUM MODEL
 # - individual slopes for rc and inhib, as well as their interaction
 cog_max_mod <-
@@ -265,7 +393,13 @@ summary(cog_max_mod) # model summary
 performance::check_model(cog_max_mod)
 
 # Model Comparison
-anova(cog_min_mod, cog_2_mod, cog_max_mod) # best model is middle mod
+model_anova <- 
+  anova(cog_min_mod, cog_2_mod, cog_max_mod) # best model is middle mod
+model_anova_tidy <- broom::tidy(model_anova) # converts to df
+
+# saves out for reporting
+# uncomment to save out
+#write_csv(model_anova_tidy, file = "output/corRT-model-anova-tidy.csv")
 
 # WM * inhibition
 interact_plot(

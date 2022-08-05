@@ -1,0 +1,8 @@
+effect,group,stat,terms,estimate
+random,ss,sd,Intercept,1102.4276376613263
+random,ss,cor,Intercept vs. rn,0.8122703546762249
+random,ss,cor,Intercept vs. inhib,-0.562413626361672
+random,ss,sd,rn,731.1660550311909
+random,ss,cor,rn vs. inhib,0.025457606263699504
+random,ss,sd,inhib,22.335193036919506
+random,Residual,sd,Observation,1632.4627056558056
