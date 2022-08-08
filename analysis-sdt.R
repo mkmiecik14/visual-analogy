@@ -255,6 +255,69 @@ mod_cog_data <-
   
 contrasts(mod_cog_data$rc) # proof that contrasts are set
 
+# vis analogy corRT summary (subject-wise)
+dp_model_ss <- 
+  cog_composites %>%
+  filter(complete.cases(.)) %>% # includes only ss with complete cog data
+  left_join(., sdt_res, by = "ss") 
+
+# vis analogy corRT summary (group-wise)
+dp_model_sum <- 
+  dp_model_ss %>%
+  group_by(rc) %>%
+  summarise(
+    M = mean(dprime), 
+    SD = sd(dprime), 
+    N = n(), 
+    SEM = SD/sqrt(N), 
+    LL = quantile(dprime, .025, na.rm = TRUE),
+    UL = quantile(dprime, .975, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+# valid only plot (bar plot version)
+pd <- position_dodge(width = .5)
+ggplot(
+  dp_model_sum, 
+  aes(rc, M)
+) +
+  geom_bar(
+    stat = "identity", 
+    position = pd, 
+    color = "black", 
+    width = .5,
+    fill = "lightgrey"
+    ) +
+  geom_errorbar(
+    aes(ymin=M-SEM, ymax = M+SEM), 
+    width = .1, 
+    position = pd
+    ) +
+  scale_y_continuous(minor_breaks = NULL) +
+  labs(
+    x = "Relational Numerosity", 
+    y = "d'", 
+    caption = "SEM error bars."
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
+# vis analogy corRT plot point version 
+pn <- position_nudge(x = .2, y = 0)
+pj <- position_jitter(width = .1)
+ggplot(dp_model_sum, aes(rc, M, group = 1)) +
+  geom_point(data = dp_model_ss, aes(y = dprime), position = pj, alpha = 1/3, shape = 16) +
+  geom_point(position = pn) +
+  geom_errorbar(aes(ymin=M-SEM, ymax = M+SEM), width = .1, position = pn) +
+  geom_line(position = pn) +
+  labs(
+    x = "Relational Numerosity", 
+    y = "d'", 
+    caption = "SEM error bars."
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+
 # MINIMAL MODEL
 cog_min_mod <-
   lmer(
@@ -265,14 +328,70 @@ cog_min_mod <-
 summary(cog_min_mod) # model summary
 performance::check_model(cog_min_mod)
 
-cog_min_mod2 <-
-  lmer(
-    dprime ~ 1 + age + rc*wm + rc*gf + rc*gc + rc*(ic*-1) + (1 | ss), 
-    data = mod_cog_data, 
-    REML = TRUE
+# Extracting estimates for table
+cog_min_mod_ests <- 
+  broom::tidy(cog_min_mod, conf.int = TRUE, conf.level = 0.95)
+
+# fixed effects table
+cog_min_mod_fixed <- 
+  cog_min_mod_ests %>% 
+  filter(effect == "fixed") %>%
+  mutate(
+    term = case_when(
+      term == "(Intercept)" ~ "Intercept",
+      term == "rcrc" ~ "rn",
+      term == "rcrc:wm" ~ "rn * wm",
+      term == "rcrc:gf" ~ "rn * gf",
+      term == "rcrc:gc" ~ "rn * gc",
+      term == "rcrc:ic" ~ "rn * ic",
+      TRUE ~ term
+    )
+  ) %>%
+  # reorders for nicer table
+  select(
+    effect, 
+    term, 
+    b = estimate, 
+    LL = conf.low, 
+    UL = conf.high, 
+    SE = std.error, 
+    t = statistic, 
+    df, 
+    p = p.value
   )
-summary(cog_min_mod2) # model summary
-performance::check_model(cog_min_mod)
+# writes out to csv
+# uncomment to save out
+#write_csv(cog_min_mod_fixed, file = "output/dprime-model-fixed-effects.csv")
+
+# random effects
+cog_min_mod_random <- 
+  cog_min_mod_ests %>% 
+  filter(effect == "ran_pars") %>%
+  mutate(effect = "random") %>%
+  separate(term, into = c("stat", "terms"), sep = "__") %>%
+  mutate(
+    terms = case_when(
+      terms == "(Intercept)" ~ "Intercept",
+      TRUE ~ terms
+    )
+  ) %>%
+  select(effect:estimate)
+# writes out to csv
+# uncomment to save out
+#write_csv(cog_min_mod_random, file = "output/dprime-model-rand-effects.csv")
+
+# Model does not have enough df to model random effect of rc
+# cog_min_mod2 <-
+#   lmer(
+#     dprime ~ 1 + age + rc*wm + rc*gf + rc*gc + rc*ic + (1 + rc | ss), 
+#     data = mod_cog_data, 
+#     REML = TRUE
+#   )
+# summary(cog_min_mod2) # model summary
+# performance::check_model(cog_min_mod)
+
+# model comparison (not possible here)
+# anova(cog_min_mod, cog_min_mod2)
 
 # Bootstrapped zero-order correlations - - - -
 # Zero order correlations
@@ -317,7 +436,7 @@ ggplot(cor_res %>% filter(var1 == "va_dprime"), aes(var2, r)) +
   geom_hline(yintercept = 0, alpha = 1/3, linetype = 2) +
   labs(
     x = "Predictors", 
-    y = "r (correlation with total visual correct RT)", 
+    y = "r (correlation with total visual d')", 
     caption = "95% CI error bars."
   ) +
   theme_classic() +

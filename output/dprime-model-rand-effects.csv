@@ -1,0 +1,3 @@
+effect,group,stat,terms,estimate
+random,ss,sd,Intercept,0.6184264361201448
+random,Residual,sd,Observation,0.38213880002508605
