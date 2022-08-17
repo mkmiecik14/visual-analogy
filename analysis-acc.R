@@ -262,7 +262,7 @@ ggplot(
 # MINIMAL MODEL
 acc_cog_min_mod <-
   lmer(
-    acc ~ 1 + age + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 | ss), 
+    acc ~ 1 + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 | ss), 
     data = vis_acc_cog_data, 
     REML = TRUE
   )
@@ -272,7 +272,7 @@ summary(acc_cog_min_mod) # model summary
 # - individual slopes for rc and inhib
 acc_cog_2_mod <-
   lmer(
-    acc ~ 1 + age + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc + inhib | ss), 
+    acc ~ 1 + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc + inhib | ss), 
     data = vis_acc_cog_data, 
     REML = TRUE
   )
@@ -354,7 +354,7 @@ acc_cog_2_mod_random <-
 acc_cog_max_mod <-
   lmer(
     acc ~ 
-      1 + age + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc*inhib | ss), 
+      1 + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc*inhib | ss), 
     data = vis_acc_cog_data, 
     REML = TRUE
   )
