@@ -273,7 +273,7 @@ ggplot(
 # MINIMAL MODEL
 cog_min_mod <-
   lmer(
-    rt ~ 1 + age + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 | ss), 
+    rt ~ 1 + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 | ss), 
     data = mod_cog_data, 
     REML = TRUE
   )
@@ -304,10 +304,11 @@ interact_plot(
 )
 
 # MEDIUM COMPLEXITY MODEL
-# - individual slopes for rc and inhib
+# random slopes for intercept and rc
+# random slopes for inhibition reached singularity and were not modeled 
 cog_2_mod <-
   lmer(
-    rt ~ 1 + age + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc + inhib | ss), 
+    rt ~ 1 + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc | ss), 
     data = mod_cog_data, 
     REML = TRUE
   )
@@ -356,7 +357,7 @@ cog_2_mod_fixed <-
   )
 # writes out to csv
 # uncomment to save out
-#write_csv(cog_2_mod_fixed, file = "output/corRT-model-fixed-effects.csv")
+write_csv(cog_2_mod_fixed, file = "output/corRT-model-fixed-effects.csv")
 
 # random effects
 cog_2_mod_random <- 
@@ -378,28 +379,29 @@ cog_2_mod_random <-
   select(effect:estimate)
 # writes out to csv
 # uncomment to save out
-#write_csv(cog_2_mod_random, file = "output/corRT-model-rand-effects.csv")
+write_csv(cog_2_mod_random, file = "output/corRT-model-rand-effects.csv")
 
 
 # MAXIMUM MODEL
+# NOT NEEDED AS THIS LEVEL OF COMPLEXITY REACHES SINGULARITY
 # - individual slopes for rc and inhib, as well as their interaction
-cog_max_mod <-
-  lmer(
-    rt ~ 1 + age + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc*inhib | ss), 
-    data = mod_cog_data, 
-    REML = TRUE
-  )
-summary(cog_max_mod) # model summary
-performance::check_model(cog_max_mod)
+# cog_max_mod <-
+#   lmer(
+#     rt ~ 1 + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc*inhib | ss), 
+#     data = mod_cog_data, 
+#     REML = TRUE
+#   )
+# summary(cog_max_mod) # model summary
+# performance::check_model(cog_max_mod)
 
 # Model Comparison
 model_anova <- 
-  anova(cog_min_mod, cog_2_mod, cog_max_mod) # best model is middle mod
+  anova(cog_min_mod, cog_2_mod) # best model is middle mod
 model_anova_tidy <- broom::tidy(model_anova) # converts to df
 
 # saves out for reporting
 # uncomment to save out
-#write_csv(model_anova_tidy, file = "output/corRT-model-anova-tidy.csv")
+write_csv(model_anova_tidy, file = "output/corRT-model-anova-tidy.csv")
 
 # WM * inhibition
 interact_plot(

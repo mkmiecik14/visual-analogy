@@ -269,10 +269,11 @@ acc_cog_min_mod <-
 summary(acc_cog_min_mod) # model summary
 
 # MEDIUM COMPLEXITY MODEL
-# - individual slopes for rc and inhib
+# only individual slopes for inhib
+# random effects model for rc was attempted, but singularity was reached
 acc_cog_2_mod <-
   lmer(
-    acc ~ 1 + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc + inhib | ss), 
+    acc ~ 1 + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + inhib | ss), 
     data = vis_acc_cog_data, 
     REML = TRUE
   )
@@ -346,24 +347,92 @@ acc_cog_2_mod_random <-
 #write_csv(acc_cog_2_mod_random, file = "output/acc-model-rand-effects.csv")
 
 
-  
-  
-
 # MAXIMUM MODEL
+# NOT NEEDED AS SINGULARITY IS REACHED AT THIS COMPLEXITY
 # - individual slopes for rc and inhib, as well as their interaction
-acc_cog_max_mod <-
-  lmer(
-    acc ~ 
-      1 + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc*inhib | ss), 
-    data = vis_acc_cog_data, 
-    REML = TRUE
-  )
-summary(acc_cog_max_mod) # model summary
-performance::check_model(acc_cog_max_mod)
+# acc_cog_max_mod <-
+#   lmer(
+#     acc ~ 
+#       1 + rc*inhib*wm + rc*inhib*gf + rc*inhib*gc + rc*inhib*ic + (1 + rc*inhib | ss), 
+#     data = vis_acc_cog_data, 
+#     REML = TRUE
+#   )
+# summary(acc_cog_max_mod) # model summary
+# performance::check_model(acc_cog_max_mod)
+# 
+# # Extracting estimates for table
+# acc_cog_max_ests <- 
+#   broom::tidy(acc_cog_max_mod, conf.int = TRUE, conf.level = 0.95)
+# 
+# # fixed effects table
+# acc_cog_max_mod_fixed <- 
+#   acc_cog_max_ests %>% 
+#   filter(effect == "fixed") %>%
+#   mutate(
+#     term = case_when(
+#       term == "(Intercept)" ~ "Intercept",
+#       term == "rcrc" ~ "rn",
+#       term == "inhibinhib" ~ "inhib",
+#       term == "rcrc:inhibinhib" ~ "rn * inhib",
+#       term == "rcrc:wm" ~ "rn * wm",
+#       term == "inhibinhib:wm" ~ "inhib * wm",
+#       term == "rcrc:gf" ~ "rn * gf",
+#       term == "inhibinhib:gf" ~ "inhib * gf",
+#       term == "rcrc:gc" ~ "rn * gc",
+#       term == "inhibinhib:gc" ~ "inhib * gc",
+#       term == "rcrc:ic" ~ "rn * ic",
+#       term == "inhibinhib:ic" ~ "inhib * ic",
+#       term == "rcrc:inhibinhib:wm" ~ "rn * inhib * wm",
+#       term == "rcrc:inhibinhib:gf" ~ "rn * inhib * gf",
+#       term == "rcrc:inhibinhib:gc" ~ "rn * inhib * gc",
+#       term == "rcrc:inhibinhib:ic" ~ "rn * inhib * ic",
+#       TRUE ~ term
+#     )
+#   ) %>%
+#   # reorders for nicer table
+#   select(
+#     effect, 
+#     term, 
+#     b = estimate, 
+#     LL = conf.low, 
+#     UL = conf.high, 
+#     SE = std.error, 
+#     t = statistic, 
+#     df, 
+#     p = p.value
+#   )
+# # writes out to csv
+# # uncomment to save out
+# # write_csv(acc_cog_max_mod_fixed, file = "output/acc-max-model-fixed-effects.csv")
+# 
+# # random effects
+# acc_cog_max_mod_random <- 
+#   acc_cog_max_ests %>% 
+#   filter(effect == "ran_pars") %>%
+#   mutate(effect = "random") %>%
+#   separate(term, into = c("stat", "terms"), sep = "__") %>%
+#   mutate(
+#     terms = case_when(
+#       terms == "(Intercept)" ~ "Intercept",
+#       terms == "(Intercept).rcrc" ~ "Intercept vs. rn",
+#       terms == "(Intercept).inhibinhib" ~ "Intercept vs. inhib",
+#       terms == "rcrc" ~ "rn",
+#       terms == "rcrc.inhibinhib" ~ "rn vs. inhib",
+#       terms == "inhibinhib" ~ "inhib",
+#       TRUE ~ terms
+#     )
+#   ) %>%
+#   select(effect:estimate)
+# # writes out to csv
+# # uncomment to save out
+# #write_csv(acc_cog_max_mod_random, file = "output/acc-max-model-rand-effects.csv")
+
+
 
 # Model Comparison
 model_anova <- 
-  anova(acc_cog_min_mod, acc_cog_2_mod, acc_cog_max_mod) # best model is max_mod
+  anova(acc_cog_min_mod, acc_cog_2_mod) 
+# best model is random effect of intercept and inhib for acc
 model_anova_tidy <- broom::tidy(model_anova) # converts to df
 
 # saves out for reporting
@@ -377,6 +446,7 @@ interact_plot(
   modx = inhib, 
   plot.points = FALSE
 )
+
 
 # Bootstrapped zero-order correlations - - - -
 # Zero order correlations

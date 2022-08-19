@@ -321,11 +321,12 @@ ggplot(dp_model_sum, aes(rc, M, group = 1)) +
 # MINIMAL MODEL
 cog_min_mod <-
   lmer(
-    dprime ~ 1 + age + rc*wm + rc*gf + rc*gc + rc*ic + (1 | ss), 
+    dprime ~ 1 + rc*wm + rc*gf + rc*gc + rc*ic + (1 | ss), 
     data = mod_cog_data, 
     REML = TRUE
   )
 summary(cog_min_mod) # model summary
+glance(cog_min_mod)
 performance::check_model(cog_min_mod)
 
 # Extracting estimates for table
@@ -361,7 +362,7 @@ cog_min_mod_fixed <-
   )
 # writes out to csv
 # uncomment to save out
-#write_csv(cog_min_mod_fixed, file = "output/dprime-model-fixed-effects.csv")
+write_csv(cog_min_mod_fixed, file = "output/dprime-model-fixed-effects.csv")
 
 # random effects
 cog_min_mod_random <- 
@@ -378,7 +379,7 @@ cog_min_mod_random <-
   select(effect:estimate)
 # writes out to csv
 # uncomment to save out
-#write_csv(cog_min_mod_random, file = "output/dprime-model-rand-effects.csv")
+write_csv(cog_min_mod_random, file = "output/dprime-model-rand-effects.csv")
 
 # Model does not have enough df to model random effect of rc
 # cog_min_mod2 <-
